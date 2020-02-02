@@ -22,17 +22,24 @@ SCRIPT
 
 Vagrant.configure(2) do |config|
 
-    vm_memory = ENV['VM_MEMORY'] || '4096'
-    vm_cpus = ENV['VM_CPUS'] || '4'
+    vm_memory = ENV['VM_MEMORY'] || '49152'
+    vm_cpus = ENV['VM_CPUS'] || '8'
 
-    config.vm.hostname = "ovnhostvm"
+    config.vm.hostname = "fakeovn"
+    ## config.vm.network "forwarded_port", guest: 80, host: 8080
+    ## or use: vagrant ssh -- -L 0.0.0.0:8080:localhost:80
+    ## config.vm.network "private_network", ip: "192.168.51.10"
+    config.vm.network "public_network",
+                     :dev => "bridge0",
+                     :mode => "bridge",
+                     :type => "bridge"
     config.vm.box = "centos/8"
     config.vm.box_check_update = false
 
-    # config.vm.synced_folder "#{ENV['PWD']}", "/vagrant", sshfs_opts_append: "-o nonempty", disabled: false, type: "sshfs"
+    config.vm.synced_folder "#{ENV['PWD']}", "/vagrant", sshfs_opts_append: "-o nonempty", disabled: false, type: "sshfs"
     # Optional: Uncomment line above and comment out the line below if you have
     # the vagrant sshfs plugin and would like to mount the directory using sshfs.
-    config.vm.synced_folder ".", "/vagrant", type: "rsync"
+    # config.vm.synced_folder ".", "/vagrant", type: "rsync"
 
     if ENV['OVS_DIR']
         config.vm.synced_folder ENV['OVS_DIR'], '/vagrant/ovs', type: 'rsync'
@@ -66,7 +73,7 @@ Vagrant.configure(2) do |config|
     # At last, start the OVN cluster! Comment this out if you are interested in
     # changing how many 'OVN chassis' or 'vms' inside these
     # chassis.
-    config.vm.provision "start_ovn_cluster", type: "shell", inline: $start_ovn_cluster, privileged: true
+    ## config.vm.provision "start_ovn_cluster", type: "shell", inline: $start_ovn_cluster, privileged: true
 
     config.vm.provider 'libvirt' do |lb|
         lb.nested = true
