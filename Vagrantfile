@@ -8,7 +8,7 @@ Vagrant.require_version ">=1.7.0"
 
 $bootstrap_centos = <<SCRIPT
 #dnf -y update ||:  ; # save your time. "vagrant box update" is your friend
-dnf -y install git time python3
+dnf -y install git time python3 emacs vim
 SCRIPT
 
 $build_images = <<SCRIPT
@@ -22,15 +22,15 @@ SCRIPT
 
 Vagrant.configure(2) do |config|
 
-    vm_memory = ENV['VM_MEMORY'] || '49152'
+    vm_memory = ENV['VM_MEMORY'] || '16384'
     vm_cpus = ENV['VM_CPUS'] || '8'
 
-    config.vm.hostname = "fakeovn"
+    config.vm.hostname = "dsalfakeovn"
     ## config.vm.network "forwarded_port", guest: 80, host: 8080
     ## or use: vagrant ssh -- -L 0.0.0.0:8080:localhost:80
-    ## config.vm.network "private_network", ip: "192.168.51.10"
-    config.vm.network "public_network",
-                     :dev => "bridge0",
+    ## config.vm.network "private_network", ip: "xx.xx.xx.xx"
+    config.vm.network "public_network", ip: "10.19.41.180", netmask:"255.255.255.0",
+                     :dev => "br0",
                      :mode => "bridge",
                      :type => "bridge"
     config.vm.box = "centos/8"
@@ -80,6 +80,7 @@ Vagrant.configure(2) do |config|
         lb.memory = vm_memory
         lb.cpus = vm_cpus
         lb.suspend_mode = 'managedsave'
+        lb.storage_pool_name = 'images'
     end
     config.vm.provider "virtualbox" do |vb|
        vb.memory = vm_memory
