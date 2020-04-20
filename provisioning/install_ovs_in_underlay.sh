@@ -16,5 +16,5 @@ curl -L http://trunk.rdoproject.org/centos8/delorean-deps.repo | sudo tee /etc/y
 ##done
 
 dnf install -y libibverbs openvswitch
-/usr/share/openvswitch/scripts/ovs-ctl --system-id=testovn start
+/usr/share/openvswitch/scripts/ovs-ctl --system-id=testovs start
 ovs-vsctl show

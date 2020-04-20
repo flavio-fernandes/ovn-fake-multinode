@@ -8,16 +8,17 @@ Vagrant.require_version ">=1.7.0"
 
 $bootstrap_centos = <<SCRIPT
 #dnf -y update ||:  ; # save your time. "vagrant box update" is your friend
-dnf -y install git time python3
+dnf -y install time python3 tcpdump nmap
 SCRIPT
 
-$build_images = <<SCRIPT
-cd /vagrant && \
-OVN_SRC_PATH=./ovn OVS_SRC_PATH=./ovs time ./ovn_cluster.sh build
-SCRIPT
+$add_extras = <<SCRIPT
+cd && python3 -m venv --copies .env
+source ./.env/bin/activate
+echo '[ -e "${HOME}/.env/bin/activate" ] && source ${HOME}/.env/bin/activate' >> .bashrc
 
-$start_ovn_cluster = <<SCRIPT
-cd /vagrant && ./ovn_cluster.sh start
+pip install --upgrade pip
+# https://scapy.readthedocs.io/en/latest/installation.html#installing-scapy-v2-x
+pip install --pre scapy[basic]
 SCRIPT
 
 Vagrant.configure(2) do |config|
@@ -25,7 +26,7 @@ Vagrant.configure(2) do |config|
     vm_memory = ENV['VM_MEMORY'] || '4096'
     vm_cpus = ENV['VM_CPUS'] || '4'
 
-    config.vm.hostname = "ovnhostvm"
+    config.vm.hostname = "connvm"
     config.vm.box = "centos/8"
     config.vm.box_check_update = false
 
@@ -34,40 +35,19 @@ Vagrant.configure(2) do |config|
     # the vagrant sshfs plugin and would like to mount the directory using sshfs.
     config.vm.synced_folder ".", "/vagrant", type: "rsync"
 
-    if ENV['OVS_DIR']
-        config.vm.synced_folder ENV['OVS_DIR'], '/vagrant/ovs', type: 'rsync'
-    end
-    if ENV['OVN_DIR']
-        config.vm.synced_folder ENV['OVN_DIR'], '/vagrant/ovn', type: 'rsync'
-    end
     config.vm.provision "bootstrap_centos", type: "shell", inline: $bootstrap_centos
-    config.vm.provision :shell do |shell|
-        shell.privileged = false
-        shell.path = 'provisioning/grab_ovn_src.sh'
-    end
 
-    config.vm.provision :shell do |shell|
-        shell.path = 'provisioning/enable_nesting.sh'
-    end
-
-    config.vm.provision :shell do |shell|
-        shell.path = 'provisioning/install_docker.sh'
-    end
-
-    config.vm.provision "build_images", type: "shell", inline: $build_images, privileged: true
-
-    # Install and start ovs used to interconnect the docker
-    # containers that are used to emulate the ovn chassis (below). This does not need
-    # to run ovn, since it is purely used as an underlay network.
+    # Install and start ovs
     config.vm.provision :shell do |shell|
          shell.path = 'provisioning/install_ovs_in_underlay.sh'
     end
 
-    # At last, start the OVN cluster! Comment this out if you are interested in
-    # changing how many 'OVN chassis' or 'vms' inside these
-    # chassis.
-    config.vm.provision "start_ovn_cluster", type: "shell", inline: $start_ovn_cluster, privileged: true
+    config.vm.provision "add_extras", type: "shell", inline: $add_extras, privileged: false
 
+    config.vm.provision :shell do |shell|
+         shell.path = 'tutorial_setup.sh'
+    end
+    
     config.vm.provider 'libvirt' do |lb|
         lb.nested = true
         lb.memory = vm_memory
