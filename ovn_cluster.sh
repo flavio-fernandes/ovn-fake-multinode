@@ -509,53 +509,31 @@ function create_fake_vms() {
 set -o errexit
 
 ovn-nbctl ls-add sw0
+ovn-nbctl lsp-add sw0 sw0-vir
+ovn-nbctl lsp-set-addresses sw0-vir "50:54:00:00:00:10 172.16.2.203"
+ovn-nbctl lsp-set-port-security sw0-vir "50:54:00:00:00:10 172.16.2.203"
+ovn-nbctl lsp-set-type sw0-vir virtual
+ovn-nbctl set logical_switch_port sw0-vir options:virtual-ip=172.16.2.203
+ovn-nbctl set logical_switch_port sw0-vir options:virtual-parents=sw0-p1,sw0-p2
 
-# ovn dhcpd on sw0
-ovn-nbctl set logical_switch sw0 \
-  other_config:subnet="10.0.0.0/24" \
-  other_config:exclude_ips="10.0.0.1..10.0.0.2"
-ovn-nbctl dhcp-options-create 10.0.0.0/24
-CIDR_UUID=\$(ovn-nbctl --bare --columns=_uuid find dhcp_options cidr="10.0.0.0/24")
-ovn-nbctl dhcp-options-set-options \$CIDR_UUID \
-  lease_time=3600 \
-  router=10.0.0.1 \
-  server_id=10.0.0.1 \
-  server_mac=c0:ff:ee:00:00:01
+ovn-nbctl lsp-add sw0 sw0-p1
+ovn-nbctl lsp-set-addresses sw0-p1 "fa:16:3e:93:a6:68 172.16.2.129"
+ovn-nbctl lsp-set-port-security sw0-p1 "fa:16:3e:93:a6:68 172.16.2.129 172.16.2.203"
 
-ovn-nbctl lsp-add sw0 sw0-port1
-ovn-nbctl lsp-set-addresses sw0-port1 "50:54:00:00:00:03 10.0.0.3 1000::3"
-ovn-nbctl lsp-add sw0 sw0-port2
-ovn-nbctl lsp-set-addresses sw0-port2 "50:54:00:00:00:04 10.0.0.4 1000::4"
-
-# Create ports in sw0 that will use dhcp from ovn
-ovn-nbctl lsp-add sw0 sw0-port3
-ovn-nbctl lsp-set-addresses sw0-port3 "50:54:00:00:00:05 dynamic"
-ovn-nbctl lsp-set-dhcpv4-options sw0-port3 \$CIDR_UUID
-ovn-nbctl lsp-add sw0 sw0-port4
-ovn-nbctl lsp-set-addresses sw0-port4 "50:54:00:00:00:06 dynamic"
-ovn-nbctl lsp-set-dhcpv4-options sw0-port4 \$CIDR_UUID
-
-# Create the second logical switch with one port
-ovn-nbctl ls-add sw1
-ovn-nbctl lsp-add sw1 sw1-port1
-ovn-nbctl lsp-set-addresses sw1-port1 "40:54:00:00:00:03 20.0.0.3 2000::3"
+ovn-nbctl lsp-add sw0 sw0-p2
+ovn-nbctl lsp-set-addresses sw0-p2 "fa:16:3e:3f:3c:d6 172.24.3.124"
+ovn-nbctl lsp-set-port-security sw0-p2 "fa:16:3e:3f:3c:d6 172.16.2.128 172.16.2.203"
 
 # Create a logical router and attach both logical switches
 ovn-nbctl lr-add lr0
-ovn-nbctl lrp-add lr0 lr0-sw0 00:00:00:00:ff:01 10.0.0.1/24 1000::a/64
+ovn-nbctl lrp-add lr0 lr0-sw0 00:00:00:00:ff:01 172.16.2.1/24 1000::a/64
 ovn-nbctl lsp-add sw0 sw0-lr0
 ovn-nbctl lsp-set-type sw0-lr0 router
 ovn-nbctl lsp-set-addresses sw0-lr0 router
 ovn-nbctl lsp-set-options sw0-lr0 router-port=lr0-sw0
 
-ovn-nbctl lrp-add lr0 lr0-sw1 00:00:00:00:ff:02 20.0.0.1/24 2000::a/64
-ovn-nbctl lsp-add sw1 sw1-lr0
-ovn-nbctl lsp-set-type sw1-lr0 router
-ovn-nbctl lsp-set-addresses sw1-lr0 router
-ovn-nbctl lsp-set-options sw1-lr0 router-port=lr0-sw1
-
 ovn-nbctl ls-add public
-ovn-nbctl lrp-add lr0 lr0-public 00:00:20:20:12:13 172.16.0.100/24 3000::a/64
+ovn-nbctl lrp-add lr0 lr0-public 00:00:20:20:12:13 10.0.0.243/24 3000::a/64
 ovn-nbctl lsp-add public public-lr0
 ovn-nbctl lsp-set-type public-lr0 router
 ovn-nbctl lsp-set-addresses public-lr0 router
@@ -572,16 +550,9 @@ ovn-nbctl lrp-set-gateway-chassis lr0-public ovn-gw-1 20
 
 # Create NAT entries for the ports
 
-# sw0-port1
-ovn-nbctl lr-nat-add lr0 dnat_and_snat 172.16.0.110 10.0.0.3 sw0-port1 30:54:00:00:00:03
-ovn-nbctl lr-nat-add lr0 dnat_and_snat 3000::c 1000::3 sw0-port1 40:54:00:00:00:03
-# sw1-port1
-ovn-nbctl lr-nat-add lr0 dnat_and_snat 172.16.0.120 20.0.0.3 sw1-port1 30:54:00:00:00:04
-ovn-nbctl lr-nat-add lr0 dnat_and_snat 3000::d 2000::3 sw1-port1 40:54:00:00:00:04
-
-# Add a snat entry
-ovn-nbctl lr-nat-add lr0 snat 172.16.0.100 10.0.0.0/24
-ovn-nbctl lr-nat-add lr0 snat 172.16.0.100 20.0.0.0/24
+# sw0-vir
+ovn-nbctl lr-nat-add lr0 dnat_and_snat 10.0.0.244 172.16.2.203 sw0-vir fa:16:3e:07:49:16
+ovn-nbctl lr-nat-add lr0 snat 10.0.0.243 172.16.2.0/24
 
 EOF
     chmod 0755 ${FAKENODE_MNT_DIR}/create_ovn_res.sh
@@ -601,8 +572,6 @@ create_fake_vm() {
     ip=\$4
     mask=\$5
     gw=\$6
-    ipv6_addr=\$7
-    ipv6_gw=\$8
     ip netns add \$name
     ovs-vsctl \
       -- add-port br-int \$name \
@@ -617,10 +586,8 @@ create_fake_vm() {
       ip netns exec \$name dhclient -sf /bin/fullstack-dhclient-script --no-pid -nw \$name
     else
       ip netns exec \$name ip addr add \$ip/\$mask dev \$name
-      ip netns exec \$name ip addr add \$ipv6_addr dev \$name
       ip netns exec \$name ip link set \$name up
       ip netns exec \$name ip route add default via \$gw dev \$name
-      ip netns exec \$name ip -6 route add default via \$ipv6_gw dev \$name
     fi
 }
 
@@ -629,15 +596,10 @@ create_fake_vm \$@
 EOF
     chmod 0755 ${FAKENODE_MNT_DIR}/create_fake_vm.sh
 
-    echo "Creating a fake VM in "${CHASSIS_NAMES[0]}" for logical port - sw0-port1"
-    ${RUNC_CMD} exec "${CHASSIS_NAMES[0]}" bash /data/create_fake_vm.sh sw0-port1 sw0p1 50:54:00:00:00:03 10.0.0.3 24 10.0.0.1 1000::3/64 1000::a
-    echo "Creating a fake VM in "${CHASSIS_NAMES[1]}" for logical port - sw1-port1"
-    ${RUNC_CMD} exec "${CHASSIS_NAMES[1]}" bash /data/create_fake_vm.sh sw1-port1 sw1p1 40:54:00:00:00:03 20.0.0.3 24 20.0.0.1 2000::3/64 2000::a
-
-    echo "Creating a fake VM in "${CHASSIS_NAMES[0]}" for logical port - sw0-port3 (using dhcp)"
-    ${RUNC_CMD} exec "${CHASSIS_NAMES[0]}" bash /data/create_fake_vm.sh sw0-port3 sw0p3 50:54:00:00:00:05 dhcp
-    echo "Creating a fake VM in "${CHASSIS_NAMES[1]}" for logical port - sw0-port4 (using dhcp)"
-    ${RUNC_CMD} exec "${CHASSIS_NAMES[1]}" bash /data/create_fake_vm.sh sw0-port4 sw0p4 50:54:00:00:00:06 dhcp
+    echo "Creating a fake VM in "${CHASSIS_NAMES[0]}" for logical port - sw0-p1"
+    ${RUNC_CMD} exec "${CHASSIS_NAMES[0]}" bash /data/create_fake_vm.sh sw0-p1 sw0p1 fa:16:3e:93:a6:68 172.16.2.129 24 172.16.2.1
+    echo "Creating a fake VM in "${CHASSIS_NAMES[1]}" for logical port - sw0-p2"
+    ${RUNC_CMD} exec "${CHASSIS_NAMES[1]}" bash /data/create_fake_vm.sh sw0-p2 sw0p2 fa:16:3e:3f:3c:d6 172.16.2.128 24 172.16.2.1
 
     echo "Creating a fake VM in the host bridge ${OVN_EXT_BR}"
     ip netns add ovnfake-ext
@@ -645,10 +607,9 @@ EOF
     ip link set ovnfake-ext netns ovnfake-ext
     ip netns exec ovnfake-ext ip link set lo up
     ip netns exec ovnfake-ext ip link set ovnfake-ext address 30:54:00:00:00:50
-    ip netns exec ovnfake-ext ip addr add 172.16.0.50/24 dev ovnfake-ext
-    ip netns exec ovnfake-ext ip addr add 3000::b/64 dev ovnfake-ext
+    ip netns exec ovnfake-ext ip addr add 10.0.0.208/24 dev ovnfake-ext
     ip netns exec ovnfake-ext ip link set ovnfake-ext up
-    ip netns exec ovnfake-ext ip route add default via 172.16.0.1
+    ip netns exec ovnfake-ext ip route add default via 10.0.0.1
 }
 
 function set-ovn-remote() {
