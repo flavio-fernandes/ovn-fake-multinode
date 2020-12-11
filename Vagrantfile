@@ -25,7 +25,11 @@ Vagrant.configure(2) do |config|
     vm_memory = ENV['VM_MEMORY'] || '4096'
     vm_cpus = ENV['VM_CPUS'] || '4'
 
-    config.vm.hostname = "ovnhostvm"
+    config.vm.network "public_network",
+                     :dev => "bridge0",
+                     :mode => "bridge",
+                     :type => "bridge"
+    config.vm.hostname = "ffovnh"
     config.vm.box = "centos/8"
     config.vm.box_check_update = false
 
@@ -39,7 +43,8 @@ Vagrant.configure(2) do |config|
                               nfs_udp: false,
                               :linux__nfs_options => ['rw','no_subtree_check','no_root_squash']
     else
-      config.vm.synced_folder ".", "/vagrant", type: "rsync"
+      # config.vm.synced_folder ".", "/vagrant", type: "rsync"
+      config.vm.synced_folder "#{ENV['PWD']}", "/vagrant", sshfs_opts_append: "-o nonempty", disabled: false, type: "sshfs"
     end
 
     if ENV['OVS_DIR']
@@ -74,7 +79,11 @@ Vagrant.configure(2) do |config|
     # At last, start the OVN cluster! Comment this out if you are interested in
     # changing how many 'OVN chassis' or 'vms' inside these
     # chassis.
-    config.vm.provision "start_ovn_cluster", type: "shell", inline: $start_ovn_cluster, privileged: true
+    # config.vm.provision "start_ovn_cluster", type: "shell", inline: $start_ovn_cluster, privileged: true
+
+    config.vm.provision :shell do |shell|
+        shell.path = 'provisioning/flaviof_devel.sh'
+    end
 
     config.vm.provider 'libvirt' do |lb|
         lb.nested = true
