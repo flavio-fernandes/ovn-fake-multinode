@@ -30,6 +30,7 @@ for k in flavio-fernandes otherwiseguy cubeek umago numansiddique dceara ; do
   echo -n "$k "
   wget -O - --quiet https://github.com/${k}.keys >> /home/vagrant/.ssh/authorized_keys 2>/dev/null
 done
+wget -O - --quiet https://launchpad.net/~numansiddique/+sshkeys >> /home/vagrant/.ssh/authorized_keys 2>/dev/null
 echo
 
 cat << EOT >> /home/vagrant/.bashrc
